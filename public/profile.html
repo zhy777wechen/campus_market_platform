@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人资料</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><div class="brand">校园二手交易</div><div class="nav"><a href="/products.html">商品</a><a href="/orders.html">订单</a><a href="/space.html">个人空间</a><button id="logout-btn">退出登录</button></div></div>
+    <h2>个人资料</h2>
+    <div id="profile" class="card">
+      <img id="avatar" src="" class="round">
+      <input id="avatar-input" type="file" accept="image/*">
+      <input id="username" placeholder="用户名">
+      <textarea id="bio" placeholder="简介"></textarea>
+      <input id="birthday" type="date" placeholder="生日">
+      <input id="gender" placeholder="性别">
+      <input id="school" placeholder="学校">
+      <div id="rating-stats"></div>
+      <button id="save-profile">保存资料</button>
+      <div id="profile-status"></div>
+    </div>
+    
+  </div>
+</body>
+</html>

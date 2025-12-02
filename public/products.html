@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>商品</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><div class="brand">校园二手交易</div><div class="nav"><a href="/profile.html">个人资料</a><a href="/orders.html">订单</a><a href="/space.html">个人空间</a></div></div>
+    <h2>发布商品</h2>
+    <div class="card">
+      <input id="p-title" placeholder="标题">
+      <textarea id="p-desc" placeholder="描述"></textarea>
+      <input id="p-price" type="number" step="0.01" placeholder="价格">
+      <input id="p-images" type="file" accept="image/*" multiple>
+      <button id="create-product">上架</button>
+      <div id="product-status"></div>
+    </div>
+    <h2>商品列表</h2>
+    <div id="product-list" class="grid"></div>
+  </div>
+</body>
+</html>
