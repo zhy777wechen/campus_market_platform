@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "id": "b36f3d8d-3df6-4456-b9f8-8ef43edd74ba",
+      "username": "1",
+      "passwordHash": "$2a$10$PhGxQeX/q.t9Ka1/JjBWmeCtnNwYkGbQMcGu6ssj7YhWpQBkNoT3W",
+      "school": "",
+      "bio": "",
+      "birthday": "",
+      "gender": "",
+      "avatarUrl": "",
+      "stats": {
+        "positiveCount": 0,
+        "totalReceivedRatings": 0
+      }
+    }
+        
+  ],
+  "products": [],
+  "orders": [],
+  "posts": []
+}
