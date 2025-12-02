@@ -175,6 +175,8 @@ function bindPost() {
     fd.append("text", document.getElementById("post-text").value);
     const files = document.getElementById("post-images").files;
     for (let i = 0; i < files.length; i++) fd.append("images", files[i]);
+    const pid = document.getElementById("post-product-id") ? document.getElementById("post-product-id").value : "";
+    if (pid) fd.append("productId", pid);
     const r = await fetch("/api/posts", { method: "POST", headers: tokenHeaders(), body: fd });
     const d = await r.json();
     loadMyPosts();
@@ -194,7 +196,45 @@ async function loadMyPosts() {
     const div = document.createElement("div");
     div.className = "card";
     const imgs = (p.images || []).map(src => `<img src="${src}" style="max-width:100%">`).join("");
-    div.innerHTML = `${imgs}<p>${p.text}</p>`;
+    const productCard = p.product ? `<div style="display:flex;align-items:center;border:1px solid #e5e7eb;border-radius:10px;padding:8px;margin-top:8px"><img src="${p.product.image || ''}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin-right:8px"><div><div style="font-weight:600">${p.product.title}</div><div class="muted">￥${p.product.price}</div></div></div>` : "";
+    div.innerHTML = `${imgs}<p>${p.text}</p>${productCard}<div style="margin-top:8px"><button data-like="${p.id}">点赞(${p.likesCount||0})</button> <button data-fav="${p.id}">收藏(${p.favoritesCount||0})</button> <button data-share="${p.id}">转发(${p.sharesCount||0})</button></div>`;
+    div.querySelector(`[data-like="${p.id}"]`).onclick = async () => { const r = await fetch(`/api/posts/${p.id}/like`, { method: "POST", headers: tokenHeaders() }); const d = await r.json(); loadMyPosts(); };
+    div.querySelector(`[data-fav="${p.id}"]`).onclick = async () => { const r = await fetch(`/api/posts/${p.id}/favorite`, { method: "POST", headers: tokenHeaders() }); const d = await r.json(); loadMyPosts(); };
+    div.querySelector(`[data-share="${p.id}"]`).onclick = async () => { const r = await fetch(`/api/posts/${p.id}/share`, { method: "POST", headers: tokenHeaders() }); const d = await r.json(); loadMyPosts(); };
+    list.appendChild(div);
+  });
+}
+
+async function loadDiscover() {
+  const res = await fetch("/api/products/discover", { headers: tokenHeaders() });
+  const data = await res.json();
+  const list = document.getElementById("discover-list");
+  if (!list) return;
+  list.innerHTML = "";
+  data.products.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "card";
+    const img = p.images && p.images[0] ? `<img src="${p.images[0]}" style="max-width:100%">` : "";
+    div.innerHTML = `${img}<h3>${p.title} - ￥${p.price}</h3><p class="muted">${p.sellerName || ''} · ${p.sellerSchool || ''}</p><a href="/product.html?id=${p.id}">查看</a>`;
+    list.appendChild(div);
+  });
+}
+
+async function loadAlumni(sort) {
+  const res = await fetch(`/api/school/posts?sort=${sort||'time'}`, { headers: tokenHeaders() });
+  const data = await res.json();
+  const list = document.getElementById("alumni-posts");
+  if (!list) return;
+  list.innerHTML = "";
+  data.posts.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "card";
+    const imgs = (p.images || []).map(src => `<img src="${src}" style="max-width:100%">`).join("");
+    const productCard = p.product ? `<div style="display:flex;align-items:center;border:1px solid #e5e7eb;border-radius:10px;padding:8px;margin-top:8px"><img src="${p.product.image || ''}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin-right:8px"><div><div style="font-weight:600">${p.product.title}</div><div class="muted">￥${p.product.price}</div></div></div>` : "";
+    div.innerHTML = `${imgs}<p>${p.text}</p><div class="muted">${p.authorName || ''}</div>${productCard}<div style="margin-top:8px"><button data-like="${p.id}">点赞(${p.likesCount||0})</button> <button data-fav="${p.id}">收藏(${p.favoritesCount||0})</button> <button data-share="${p.id}">转发(${p.sharesCount||0})</button></div>`;
+    div.querySelector(`[data-like="${p.id}"]`).onclick = async () => { await fetch(`/api/posts/${p.id}/like`, { method: "POST", headers: tokenHeaders() }); loadAlumni(sort); };
+    div.querySelector(`[data-fav="${p.id}"]`).onclick = async () => { await fetch(`/api/posts/${p.id}/favorite`, { method: "POST", headers: tokenHeaders() }); loadAlumni(sort); };
+    div.querySelector(`[data-share="${p.id}"]`).onclick = async () => { await fetch(`/api/posts/${p.id}/share`, { method: "POST", headers: tokenHeaders() }); loadAlumni(sort); };
     list.appendChild(div);
   });
 }
@@ -222,4 +262,67 @@ document.addEventListener("DOMContentLoaded", () => {
   loadProductDetail();
   loadOrders();
   loadMyPosts();
+  if (path.endsWith("/discover.html")) {
+    loadDiscover();
+    return;
+  }
+  if (path.endsWith("/alumni.html")) {
+    const s = document.getElementById("alumni-sort");
+    if (s) { s.onchange = () => loadAlumni(s.value); }
+    loadAlumni(s ? s.value : "time");
+    return;
+  }
+  if (path.endsWith("/user.html")) {
+    loadUserPage();
+    return;
+  }
+  if (path.endsWith("/chat.html")) {
+    initChatPage();
+    return;
+  }
 });
+
+async function loadUserPage() {
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id");
+  const res = await fetch(`/api/users/${id}/profile`, { headers: tokenHeaders() });
+  const data = await res.json();
+  const c = document.getElementById("user-profile");
+  if (!c || !data.user) return;
+  c.innerHTML = `<img src="${data.user.avatarUrl||''}" class="round"><h3>${data.user.username}</h3><p class="muted">${data.user.school||''}</p><p>${data.user.bio||''}</p><p>关注 ${data.followingCount} · 粉丝 ${data.followersCount}</p><button id="follow-btn">${data.isFollowing?"取消关注":"关注"}</button>`;
+  const btn = document.getElementById("follow-btn");
+  if (btn) btn.onclick = async () => {
+    const url = data.isFollowing ? `/api/users/${id}/unfollow` : `/api/users/${id}/follow`;
+    await fetch(url, { method: "POST", headers: tokenHeaders() });
+    loadUserPage();
+  };
+  const chatLink = document.getElementById("chat-link");
+  if (chatLink) chatLink.href = `/chat.html?userId=${id}`;
+}
+
+async function initChatPage() {
+  const params = new URLSearchParams(location.search);
+  const otherId = params.get("userId");
+  const list = document.getElementById("messages");
+  const input = document.getElementById("chat-text");
+  const send = document.getElementById("chat-send");
+  async function refresh() {
+    const r = await fetch(`/api/messages?userId=${otherId}`, { headers: tokenHeaders() });
+    const d = await r.json();
+    list.innerHTML = "";
+    d.messages.forEach(m => {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `<div>${m.text}</div>`;
+      list.appendChild(div);
+    });
+  }
+  if (send) send.onclick = async () => {
+    const t = input.value;
+    if (!t) return;
+    await fetch(`/api/messages`, { method: "POST", headers: { ...tokenHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ toUserId: otherId, text: t }) });
+    input.value = "";
+    refresh();
+  };
+  refresh();
+}

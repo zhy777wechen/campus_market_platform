@@ -1,9 +1,9 @@
 {
   "users": [
     {
-      "id": "3fb72ff1-7428-417b-a326-eff215e28b9b",
-      "username": "123",
-      "passwordHash": "$2a$10$hVZoMnpE3eTh1BydW8kqceXlnVsmnnmPLIxKuCSyzNJztWk8auSHe",
+      "id": "b36f3d8d-3df6-4456-b9f8-8ef43edd74ba",
+      "username": "1",
+      "passwordHash": "$2a$10$PhGxQeX/q.t9Ka1/JjBWmeCtnNwYkGbQMcGu6ssj7YhWpQBkNoT3W",
       "school": "",
       "bio": "",
       "birthday": "",
@@ -14,6 +14,7 @@
         "totalReceivedRatings": 0
       }
     }
+        }
   ],
   "products": [],
   "orders": [],

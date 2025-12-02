@@ -40,7 +40,7 @@ app.use(express.static(publicDir));
 
 function readData() {
   if (!fs.existsSync(dataFile)) {
-    fs.writeFileSync(dataFile, JSON.stringify({ users: [], products: [], orders: [], posts: [] }, null, 2));
+    fs.writeFileSync(dataFile, JSON.stringify({ users: [], products: [], orders: [], posts: [], messages: [] }, null, 2));
   }
   const raw = fs.readFileSync(dataFile, "utf-8");
   return JSON.parse(raw || "{}");
@@ -75,7 +75,7 @@ app.post("/api/auth/register", async (req, res) => {
   const exists = db.users.find(u => u.username === username);
   if (exists) return res.status(400).json({ error: "username_exists" });
   const hash = await bcrypt.hash(password, 10);
-  const user = { id: uuidv4(), username, passwordHash: hash, school: school || "", bio: "", birthday: "", gender: "", avatarUrl: "", stats: { positiveCount: 0, totalReceivedRatings: 0 } };
+  const user = { id: uuidv4(), username, passwordHash: hash, school: school || "", bio: "", birthday: "", gender: "", avatarUrl: "", stats: { positiveCount: 0, totalReceivedRatings: 0 }, following: [], followers: [] };
   db.users.push(user);
   writeData(db);
   const token = createToken(user);
@@ -209,9 +209,9 @@ app.get("/api/users/:id/ratings", (req, res) => {
 });
 
 app.post("/api/posts", authMiddleware, upload.array("images", 6), (req, res) => {
-  const { text } = req.body;
+  const { text, productId } = req.body;
   const db = readData();
-  const post = { id: uuidv4(), userId: req.userId, text: text || "", images: (req.files || []).map(f => `/uploads/${f.filename}`), createdAt: Date.now() };
+  const post = { id: uuidv4(), userId: req.userId, text: text || "", images: (req.files || []).map(f => `/uploads/${f.filename}`), productId: productId || "", likesCount: 0, favoritesCount: 0, sharesCount: 0, likedBy: [], favoritedBy: [], sharedBy: [], createdAt: Date.now() };
   db.posts.push(post);
   writeData(db);
   res.json({ post });
@@ -221,7 +221,141 @@ app.get("/api/posts", (req, res) => {
   const { userId } = req.query;
   const db = readData();
   const posts = userId ? db.posts.filter(p => p.userId === userId) : db.posts;
+  const result = posts.map(p => {
+    let product = null;
+    if (p.productId) {
+      const prod = db.products.find(x => x.id === p.productId);
+      if (prod) product = { id: prod.id, title: prod.title, price: prod.price, image: (prod.images || [])[0] || "" };
+    }
+    return { ...p, product };
+  });
+  res.json({ posts: result });
+});
+
+app.get("/api/products/discover", authMiddleware, (req, res) => {
+  const db = readData();
+  const me = db.users.find(u => u.id === req.userId);
+  const items = db.products.map(p => {
+    const seller = db.users.find(u => u.id === p.sellerId) || {};
+    return { ...p, sellerSchool: seller.school || "", sellerName: seller.username || "" };
+  });
+  items.sort((a, b) => {
+    const aSame = a.sellerSchool && me && a.sellerSchool === me.school ? 1 : 0;
+    const bSame = b.sellerSchool && me && b.sellerSchool === me.school ? 1 : 0;
+    if (bSame !== aSame) return bSame - aSame;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+  res.json({ products: items });
+});
+
+app.get("/api/school/posts", authMiddleware, (req, res) => {
+  const { sort } = req.query;
+  const db = readData();
+  const me = db.users.find(u => u.id === req.userId);
+  const posts = db.posts.filter(p => {
+    const author = db.users.find(u => u.id === p.userId);
+    return author && author.school === (me ? me.school : "");
+  }).map(p => {
+    const author = db.users.find(u => u.id === p.userId) || {};
+    let product = null;
+    if (p.productId) {
+      const prod = db.products.find(x => x.id === p.productId);
+      if (prod) product = { id: prod.id, title: prod.title, price: prod.price, image: (prod.images || [])[0] || "" };
+    }
+    return { ...p, authorName: author.username || "", product };
+  });
+  if (sort === "likes") posts.sort((a, b) => (b.likesCount || 0) - (a.likesCount || 0));
+  else posts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   res.json({ posts });
+});
+
+app.post("/api/posts/:id/like", authMiddleware, (req, res) => {
+  const db = readData();
+  const post = db.posts.find(p => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: "not_found" });
+  post.likedBy = post.likedBy || [];
+  const idx = post.likedBy.indexOf(req.userId);
+  if (idx >= 0) post.likedBy.splice(idx, 1); else post.likedBy.push(req.userId);
+  post.likesCount = post.likedBy.length;
+  writeData(db);
+  res.json({ likesCount: post.likesCount, liked: post.likedBy.includes(req.userId) });
+});
+
+app.post("/api/posts/:id/favorite", authMiddleware, (req, res) => {
+  const db = readData();
+  const post = db.posts.find(p => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: "not_found" });
+  post.favoritedBy = post.favoritedBy || [];
+  const idx = post.favoritedBy.indexOf(req.userId);
+  if (idx >= 0) post.favoritedBy.splice(idx, 1); else post.favoritedBy.push(req.userId);
+  post.favoritesCount = post.favoritedBy.length;
+  writeData(db);
+  res.json({ favoritesCount: post.favoritesCount, favorited: post.favoritedBy.includes(req.userId) });
+});
+
+app.post("/api/posts/:id/share", authMiddleware, (req, res) => {
+  const db = readData();
+  const post = db.posts.find(p => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: "not_found" });
+  post.sharedBy = post.sharedBy || [];
+  if (!post.sharedBy.includes(req.userId)) post.sharedBy.push(req.userId);
+  post.sharesCount = post.sharedBy.length;
+  writeData(db);
+  res.json({ sharesCount: post.sharesCount });
+});
+
+app.get("/api/users/:id/profile", authMiddleware, (req, res) => {
+  const db = readData();
+  const user = db.users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: "not_found" });
+  user.followers = user.followers || [];
+  user.following = user.following || [];
+  const isFollowing = user.followers.includes(req.userId);
+  res.json({ user: { id: user.id, username: user.username, avatarUrl: user.avatarUrl, bio: user.bio, school: user.school }, followingCount: user.following.length, followersCount: user.followers.length, isFollowing });
+});
+
+app.post("/api/users/:id/follow", authMiddleware, (req, res) => {
+  const db = readData();
+  const target = db.users.find(u => u.id === req.params.id);
+  const me = db.users.find(u => u.id === req.userId);
+  if (!target || !me) return res.status(404).json({ error: "not_found" });
+  me.following = me.following || [];
+  target.followers = target.followers || [];
+  if (!me.following.includes(target.id)) me.following.push(target.id);
+  if (!target.followers.includes(me.id)) target.followers.push(me.id);
+  writeData(db);
+  res.json({ ok: true });
+});
+
+app.post("/api/users/:id/unfollow", authMiddleware, (req, res) => {
+  const db = readData();
+  const target = db.users.find(u => u.id === req.params.id);
+  const me = db.users.find(u => u.id === req.userId);
+  if (!target || !me) return res.status(404).json({ error: "not_found" });
+  me.following = me.following || [];
+  target.followers = target.followers || [];
+  me.following = me.following.filter(x => x !== target.id);
+  target.followers = target.followers.filter(x => x !== me.id);
+  writeData(db);
+  res.json({ ok: true });
+});
+
+app.get("/api/messages", authMiddleware, (req, res) => {
+  const otherId = req.query.userId;
+  const db = readData();
+  const msgs = db.messages.filter(m => (m.fromUserId === req.userId && m.toUserId === otherId) || (m.fromUserId === otherId && m.toUserId === req.userId));
+  msgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  res.json({ messages: msgs });
+});
+
+app.post("/api/messages", authMiddleware, (req, res) => {
+  const { toUserId, text } = req.body;
+  if (!toUserId || !text) return res.status(400).json({ error: "missing_fields" });
+  const db = readData();
+  const msg = { id: uuidv4(), fromUserId: req.userId, toUserId, text, createdAt: Date.now() };
+  db.messages.push(msg);
+  writeData(db);
+  res.json({ message: msg });
 });
 
 const port = parseInt(process.env.PORT || "3000", 10);
